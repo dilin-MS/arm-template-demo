@@ -1,0 +1,95 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "sqlAdministratorLogin": {
+            "type": "string",
+            "metadata": {
+                "description": "The admin user of the SQL Server"
+            },
+            "defaultValue": "dilin"
+        },
+        "sqlAdministratorLoginPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password of the admin user of the SQL Server"
+            }
+        }
+    },
+    "variables": {
+        "hostingPlanName": "dilin-demo-deploy-connection-plan",
+        "webSiteName": "dilin-demo-deploy-connection-webapp",
+        "sqlserverName": "dilin-demo-deploy-connection-server",
+        "databaseName": "dilin-demo-deploy-connection-database"
+    },
+    "resources": [
+        {
+            "name": "[variables('sqlserverName')]",
+            "type": "Microsoft.Sql/servers",
+            "apiVersion": "2018-06-01-preview",
+            "location": "eastus",
+            "resources": [
+                {
+                    "type": "firewallrules",
+                    "apiVersion": "2018-06-01-preview",
+                    "dependsOn": [
+                        "[variables('sqlserverName')]"
+                    ],
+                    "name": "AllowAllWindowsAzureIps",
+                    "properties": {
+                        "endIpAddress": "0.0.0.0",
+                        "startIpAddress": "0.0.0.0"
+                    }
+                }
+            ]
+        },
+        {
+            "apiVersion": "2018-02-01",
+            "name": "[variables('hostingPlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "location": "Central US",
+            "sku": {
+                "name": "S1",
+                "tier": "Standard",
+                "size": "S1",
+                "family": "S",
+                "capacity": 1
+            },
+            "tags": {
+                "displayName": "HostingPlan"
+            },
+            "properties": {
+                "name": "[variables('hostingPlanName')]"
+            }
+        },
+        {
+            "apiVersion": "2018-02-01",
+            "name": "[variables('webSiteName')]",
+            "type": "Microsoft.Web/sites",
+            "location": "Central US",
+            "dependsOn": [
+                "[variables('hostingPlanName')]"
+            ],
+            "properties": {
+                "name": "[variables('webSiteName')]",
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]"
+            },
+            "resources": [
+                {
+                    "apiVersion": "2018-02-01",
+                    "type": "config",
+                    "name": "connectionstrings",
+                    "dependsOn": [
+                        "[variables('webSiteName')]"
+                    ],
+                    "properties": {
+                        "MyDbConnection": {
+                            "value": "[concat('Data Source=tcp:', reference(concat('Microsoft.Sql/servers/', variables('sqlserverName'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', variables('databaseName'), ';User Id=', parameters('sqlAdministratorLogin'), '@', reference(concat('Microsoft.Sql/servers/', variables('sqlserverName'))).fullyQualifiedDomainName, ';Password=', parameters('sqlAdministratorLoginPassword'), ';')]",
+                            "type": "SQLAzure"
+                        }
+                    }
+                }
+            ]
+        },
+    ]
+}
